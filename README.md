@@ -1,5 +1,8 @@
 # flametrace
 
+[![codecov](https://codecov.io/gh/leifwalsh/flametrace/branch/main/graph/badge.svg?token=TDFS4CVZCQ)](https://codecov.io/gh/leifwalsh/flametrace)
+[![Documentation Status](https://readthedocs.org/projects/flametrace/badge/?version=latest)](https://flametrace.readthedocs.io/en/latest/?badge=latest)
+
 Build flamegraph charts for process trees, based on strace.
 
 If you’ve ever wanted to know why a command is slow, flametrace can help! Run
