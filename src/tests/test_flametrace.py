@@ -62,3 +62,8 @@ class FlametraceTests(FlametraceTestBase):
         self.assertIn(f"folded: {self.out_base}.folded", self.stdout)
         self.assertIn(f"chart:  {self.out_base}.svg", self.stdout)
         self.assertEqual(0, self.returncode)
+
+
+class Flake8FlametraceTests(FlametraceTests):
+
+    command = ["tox", "-e", "flake8"]
