@@ -25,9 +25,12 @@
 # DAMAGE.
 
 from pathlib import Path
-import subprocess
 import tempfile
 from unittest import TestCase
+
+from click.testing import CliRunner
+
+from flametrace.main import cli
 
 
 class FlametraceTestBase(TestCase):
@@ -37,15 +40,13 @@ class FlametraceTestBase(TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.out_base = Path(self.tmpdir.name, "trace")
-        proc = subprocess.run(
-            ["flametrace", "--output-base", self.out_base, *self.command],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+        runner = CliRunner(mix_stderr=False)
+        result = runner.invoke(
+            cli, ["--output-base", self.out_base, *self.command]
         )
-        self.returncode = proc.returncode
-        self.stdout = proc.stdout
-        self.stderr = proc.stderr
+        self.returncode = result.exit_code
+        self.stdout = result.stdout
+        self.stderr = result.stderr
 
     def tearDown(self):
         self.tmpdir.cleanup()
