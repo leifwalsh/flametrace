@@ -36,7 +36,8 @@
 		"bodil.prettier-toml",
 		"ms-python.vscode-pylance",
 		"lextudio.restructuredtext",
-		"stkb.rewrap"
+		"stkb.rewrap",
+		"github.vscode-pull-request-github"
 	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
