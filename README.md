@@ -2,6 +2,7 @@
 
 [![codecov](https://codecov.io/gh/leifwalsh/flametrace/branch/main/graph/badge.svg?token=TDFS4CVZCQ)](https://codecov.io/gh/leifwalsh/flametrace)
 [![Documentation Status](https://readthedocs.org/projects/flametrace/badge/?version=latest)](https://flametrace.readthedocs.io/en/latest/?badge=latest)
+[![PyPI Package](https://img.shields.io/pypi/v/flametrace)](https://pypi.org/project/flametrace/)
 
 Build flamegraph charts for process trees, based on strace.
 
