@@ -1,0 +1,440 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1600" height="150" onload="init(evt)" viewBox="0 0 1600 150" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
+<!-- NOTES:  -->
+<defs>
+	<linearGradient id="background" y1="0" y2="1" x1="0" x2="0" >
+		<stop stop-color="#f8f8f8" offset="5%" />
+		<stop stop-color="#e8e8e8" offset="95%" />
+	</linearGradient>
+</defs>
+<style type="text/css">
+	text { font-family:Verdana; font-size:12px; fill:rgb(0,0,0); }
+	#search, #ignorecase { opacity:0.1; cursor:pointer; }
+	#search:hover, #search.show, #ignorecase:hover, #ignorecase.show { opacity:1; }
+	#subtitle { text-anchor:middle; font-color:rgb(160,160,160); }
+	#title { text-anchor:middle; font-size:17px}
+	#unzoom { cursor:pointer; }
+	#frames > *:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+	.hide { display:none; }
+	.parent { opacity:0.5; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	"use strict";
+	var details, searchbtn, unzoombtn, matchedtxt, svg, searching, currentSearchTerm, ignorecase, ignorecaseBtn;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		ignorecaseBtn = document.getElementById("ignorecase");
+		unzoombtn = document.getElementById("unzoom");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+		currentSearchTerm = null;
+	}
+
+	window.addEventListener("click", function(e) {
+		var target = find_group(e.target);
+		if (target) {
+			if (target.nodeName == "a") {
+				if (e.ctrlKey === false) return;
+				e.preventDefault();
+			}
+			if (target.classList.contains("parent")) unzoom();
+			zoom(target);
+		}
+		else if (e.target.id == "unzoom") unzoom();
+		else if (e.target.id == "search") search_prompt();
+		else if (e.target.id == "ignorecase") toggle_ignorecase();
+	}, false)
+
+	// mouse-over for info
+	// show
+	window.addEventListener("mouseover", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = "Frame: " + g_to_text(target);
+	}, false)
+
+	// clear
+	window.addEventListener("mouseout", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = ' ';
+	}, false)
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	}, false)
+
+	// ctrl-I to toggle case-sensitive search
+	window.addEventListener("keydown",function (e) {
+		if (e.ctrlKey && e.keyCode === 73) {
+			e.preventDefault();
+			toggle_ignorecase();
+		}
+	}, false)
+
+	// functions
+	function find_child(node, selector) {
+		var children = node.querySelectorAll(selector);
+		if (children.length) return children[0];
+		return;
+	}
+	function find_group(node) {
+		var parent = node.parentElement;
+		if (!parent) return;
+		if (parent.id == "frames") return node;
+		return find_group(parent);
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_" + attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_" + attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_" + attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes.width.value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes.x.value = parseFloat(r.attributes.x.value) + 3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2 * 12 * 0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x = txt.length - 2; x > 0; x--) {
+			if (t.getSubStringLength(0, x + 2) <= w) {
+				t.textContent = txt.substring(0, x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = (parseFloat(e.attributes.x.value) - x - 10) * ratio + 10;
+				if (e.tagName == "text")
+					e.attributes.x.value = find_child(e.parentNode, "rect[x]").attributes.x.value + 3;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseFloat(e.attributes.width.value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_child(c[i], x - 10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = 10;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseInt(svg.width.baseVal.value) - (10 * 2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr.width.value);
+		var xmin = parseFloat(attr.x.value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr.y.value);
+		var ratio = (svg.width.baseVal.value - 2 * 10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		unzoombtn.classList.remove("hide");
+
+		var el = document.getElementById("frames").children;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a.x.value);
+			var ew = parseFloat(a.width.value);
+			var upstack;
+			// Is it an ancestor
+			if (0 == 0) {
+				upstack = parseFloat(a.y.value) > ymin;
+			} else {
+				upstack = parseFloat(a.y.value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.classList.add("parent");
+					zoom_parent(e);
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.classList.add("hide");
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.classList.add("hide");
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					update_text(e);
+				}
+			}
+		}
+		search();
+	}
+	function unzoom() {
+		unzoombtn.classList.add("hide");
+		var el = document.getElementById("frames").children;
+		for(var i = 0; i < el.length; i++) {
+			el[i].classList.remove("parent");
+			el[i].classList.remove("hide");
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+		search();
+	}
+
+	// search
+	function toggle_ignorecase() {
+		ignorecase = !ignorecase;
+		if (ignorecase) {
+			ignorecaseBtn.classList.add("show");
+		} else {
+			ignorecaseBtn.classList.remove("show");
+		}
+		reset_search();
+		search();
+	}
+	function reset_search() {
+		var el = document.querySelectorAll("#frames rect");
+		for (var i = 0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)"
+			    + (ignorecase ? ", ignoring case" : "")
+			    + "\nPress Ctrl-i to toggle case sensitivity", "");
+			if (term != null) {
+				currentSearchTerm = term;
+				search();
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			currentSearchTerm = null;
+			searchbtn.classList.remove("show");
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.classList.add("hide");
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		if (currentSearchTerm === null) return;
+		var term = currentSearchTerm;
+
+		var re = new RegExp(term, ignorecase ? 'i' : '');
+		var el = document.getElementById("frames").children;
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes.width.value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes.x.value);
+				orig_save(rect, "fill");
+				rect.attributes.fill.value = "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.classList.add("show");
+		searchbtn.firstChild.nodeValue = "Reset Search";
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.classList.remove("hide");
+		var pct = 100 * count / maxwidth;
+		if (pct != 100) pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+]]>
+</script>
+<rect x="0.0" y="0" width="1600.0" height="150.0" fill="url(#background)"  />
+<text id="title" x="800.00" y="24" >Flame Chart</text>
+<text id="details" x="10.00" y="133" > </text>
+<text id="unzoom" x="10.00" y="24" class="hide">Reset Zoom</text>
+<text id="search" x="1490.00" y="24" >Search</text>
+<text id="ignorecase" x="1574.00" y="24" >ic</text>
+<text id="matched" x="1490.00" y="133" > </text>
+<g id="frames">
+<g >
+<title>/workspaces/flametrace/.tox/flake8/bin/python(4634) ['/workspaces/flametrace/.tox/flake8/bin/python', '/workspaces/flametrace/venv/lib/python3.9/site-packages/tox/helper/get_version.py'] (130,777 us, 1.16%)</title><rect x="167.2" y="69" width="18.3" height="15.0" fill="rgb(59,173,173)" rx="2" ry="2" />
+<text  x="170.17" y="79.5" ></text>
+</g>
+<g >
+<title>/usr/bin/lsb_release(4640) ['lsb_release', '-a'] (136,736 us, 1.21%)</title><rect x="185.5" y="53" width="19.1" height="15.0" fill="rgb(78,191,191)" rx="2" ry="2" />
+<text  x="188.48" y="63.5" ></text>
+</g>
+<g >
+<title>/workspaces/flametrace/.tox/flake8/bin/python(4711) ['/workspaces/flametrace/.tox/flake8/bin/python', '/workspaces/flametrace/.tox/flake8/lib/python3.9/site-packages/pip/_vendor/pep517/_in_process.py', 'build_wheel', '/tmp/tmpy2g0_fgd'] (795,223 us, 7.04%)</title><rect x="984.3" y="53" width="111.3" height="15.0" fill="rgb(106,216,216)" rx="2" ry="2" />
+<text  x="987.35" y="63.5" >/workspaces/f..</text>
+</g>
+<g >
+<title>/usr/bin/lsb_release(4644) ['lsb_release', '-a'] (113,184 us, 1.00%)</title><rect x="206.0" y="37" width="15.8" height="15.0" fill="rgb(77,190,190)" rx="2" ry="2" />
+<text  x="209.00" y="47.5" ></text>
+</g>
+<g >
+<title>/workspaces/flametrace/.tox/flake8/bin/python(4709) ['/workspaces/flametrace/.tox/flake8/bin/python', '/workspaces/flametrace/.tox/flake8/lib/python3.9/site-packages/pip/_vendor/pep517/_in_process.py', 'prepare_metadata_for_build_wheel', '/tmp/tmphgp76vn1'] (663,394 us, 5.88%)</title><rect x="891.5" y="53" width="92.8" height="15.0" fill="rgb(91,203,203)" rx="2" ry="2" />
+<text  x="894.50" y="63.5" >/workspaces..</text>
+</g>
+<g >
+<title>/workspaces/flametrace/.tox/flake8/bin/flake8(4718) ['/workspaces/flametrace/.tox/flake8/bin/flake8'] (668,608 us, 5.92%)</title><rect x="1416.4" y="69" width="93.6" height="15.0" fill="rgb(52,167,167)" rx="2" ry="2" />
+<text  x="1419.39" y="79.5" >/workspaces..</text>
+</g>
+<g >
+<title>/workspaces/flametrace/.tox/flake8/bin/python(4635) ['/workspaces/flametrace/.tox/flake8/bin/python', '-m', 'pip', 'install', '--no-deps', '-U', '.tox/.tmp/package/1/flametrace-0.1.0.zip'] (8,001,314 us, 70.87%)</title><rect x="185.5" y="69" width="1119.8" height="15.0" fill="rgb(86,198,198)" rx="2" ry="2" />
+<text  x="188.48" y="79.5" >/workspaces/flametrace/.tox/flake8/bin/python(4635) ['/workspaces/flametrace/.tox/flake8/bin/python', '-m', 'pip', 'install', '--no-deps', '-U', '.tox/.tmp/..</text>
+</g>
+<g >
+<title>/bin/uname(4645) ['uname', '-rs'] (8,407 us, 0.07%)</title><rect x="221.8" y="37" width="1.2" height="15.0" fill="rgb(109,219,219)" rx="2" ry="2" />
+<text  x="224.84" y="47.5" ></text>
+</g>
+<g >
+<title>/workspaces/flametrace/venv/bin/python(4625) ['/workspaces/flametrace/venv/bin/python', '/workspaces/flametrace/venv/lib/python3.9/site-packages/tox/helper/get_version.py'] (168,884 us, 1.50%)</title><rect x="143.5" y="69" width="23.7" height="15.0" fill="rgb(72,185,185)" rx="2" ry="2" />
+<text  x="146.54" y="79.5" >/..</text>
+</g>
+<g >
+<title>/workspaces/flametrace/.tox/flake8/bin/python(4716) ['/workspaces/flametrace/.tox/flake8/bin/python', '-m', 'pip', 'freeze'] (793,799 us, 7.03%)</title><rect x="1305.3" y="69" width="111.1" height="15.0" fill="rgb(94,205,205)" rx="2" ry="2" />
+<text  x="1308.29" y="79.5" >/workspaces/f..</text>
+</g>
+<g >
+<title>/workspaces/flametrace/.tox/flake8/bin/python(4692) ['/workspaces/flametrace/.tox/flake8/bin/python', '/workspaces/flametrace/.tox/flake8/lib/python3.9/site-packages/pip/_vendor/pep517/_in_process.py', 'get_requires_for_build_wheel', '/tmp/tmpxhv82s5u'] (750,303 us, 6.65%)</title><rect x="786.5" y="53" width="105.0" height="15.0" fill="rgb(57,171,171)" rx="2" ry="2" />
+<text  x="789.49" y="63.5" >/workspaces/..</text>
+</g>
+<g >
+<title>/bin/uname(4641) ['uname', '-rs'] (9,927 us, 0.09%)</title><rect x="204.6" y="53" width="1.4" height="15.0" fill="rgb(87,198,198)" rx="2" ry="2" />
+<text  x="207.61" y="63.5" ></text>
+</g>
+<g >
+<title>/workspaces/flametrace/venv/bin/tox(4613) ['tox', '-e', 'flake8'] (11,289,400 us, 100.00%)</title><rect x="10.0" y="85" width="1580.0" height="15.0" fill="rgb(96,207,207)" rx="2" ry="2" />
+<text  x="13.00" y="95.5" >/workspaces/flametrace/venv/bin/tox(4613) ['tox', '-e', 'flake8']</text>
+</g>
+<g >
+<title>all (11,289,400 us, 100%)</title><rect x="10.0" y="101" width="1580.0" height="15.0" fill="rgb(55,170,170)" rx="2" ry="2" />
+<text  x="13.00" y="111.5" ></text>
+</g>
+<g >
+<title>/workspaces/flametrace/venv/bin/python(4620) ['/workspaces/flametrace/venv/bin/python', 'setup.py', 'sdist', '--formats=zip', '--dist-dir', '.tox/dist'] (954,144 us, 8.45%)</title><rect x="10.0" y="69" width="133.5" height="15.0" fill="rgb(96,207,207)" rx="2" ry="2" />
+<text  x="13.00" y="79.5" >/workspaces/flam..</text>
+</g>
+<g >
+<title>/workspaces/flametrace/.tox/flake8/bin/python(4642) ['/workspaces/flametrace/.tox/flake8/bin/python', '/workspaces/flametrace/.tox/flake8/lib/python3.9/site-packages/pip', 'install', '--ignore-installed', '--no-user', '--prefix', '/tmp/pip-build-env-a7_a31r6/overlay', '--no-warn-script-location', '--no-binary', ':none:', '--only-binary', ':none:', '-i', 'https://pypi.org/simple', '--', 'setuptools', 'wheel'] (4,147,735 us, 36.74%)</title><rect x="206.0" y="53" width="580.5" height="15.0" fill="rgb(105,215,215)" rx="2" ry="2" />
+<text  x="209.00" y="63.5" >/workspaces/flametrace/.tox/flake8/bin/python(4642) ['/workspaces/flametrace/.t..</text>
+</g>
+</g>
+</svg>

@@ -1,0 +1,3 @@
+[flake8]
+ignore = E203
+exclude = .git,__pycache__,doc/conf.py,build,dist,venv,.tox
