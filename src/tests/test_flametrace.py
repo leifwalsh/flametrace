@@ -71,4 +71,4 @@ class FlametraceTests(FlametraceTestBase):
 )
 class Flake8FlametraceTests(FlametraceTests):
 
-    command = ["tox", "-e", "flake8"]
+    command = ["--mode", "io", "tox", "-e", "flake8"]
