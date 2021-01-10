@@ -25,8 +25,9 @@
 # DAMAGE.
 
 from pathlib import Path
+import sys
 import tempfile
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 
 from click.testing import CliRunner
 
@@ -64,6 +65,10 @@ class FlametraceTests(FlametraceTestBase):
         self.assertEqual(0, self.returncode)
 
 
+@skipUnless(
+    sys.version_info.major == 3 and sys.version_info.minor == 9,
+    "only run on python 3.9",
+)
 class Flake8FlametraceTests(FlametraceTests):
 
     command = ["tox", "-e", "flake8"]
