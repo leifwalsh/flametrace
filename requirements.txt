@@ -1,0 +1,7 @@
+click
+tox
+sphinx
+sphinx_click
+sphinx_rtd_theme
+rstcheck
+snooty
