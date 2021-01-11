@@ -22,6 +22,8 @@ pip install flametrace
 flametrace COMMAND
 ```
 
+![Sample Output](./doc/_static/trace.svg)
+
 ## License
 
 [BSD 3-clause](./LICENSE)
