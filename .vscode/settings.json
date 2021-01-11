@@ -2,11 +2,10 @@
     "python.linting.flake8Enabled": true,
     "python.formatting.provider": "black",
     "editor.formatOnSave": true,
-    "python.pythonPath": "venv/bin/python",
     "python.testing.unittestArgs": [
         "-v",
         "-s",
-        "./src/tests",
+        "./src",
         "-p",
         "test_*.py"
     ],
