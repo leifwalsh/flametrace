@@ -108,7 +108,7 @@ def _collapse_stacks(strace_output, folded_output):
 @click.argument("command", nargs=-1)
 def cli(output, flamegraph_options, mode, command):
     """Run a command and render a flamegraph based on its process tree."""
-    if not output:
+    if not output:  # pragma: no cover
         now = datetime.now()
         argv0 = os.path.basename(command[0])
         basename = f"{argv0}-{now:%Y%m%d_%H%M%S_%f}"
