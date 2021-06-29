@@ -46,6 +46,8 @@ class StraceParser(object):
         if call.startswith("+++ exited with "):
             retcode = int(call[len("+++ exited with ") :].split()[0])
             return "atexit", None, retcode, None, None
+        elif call == "+++ killed by SIGPIPE +++":
+            return "atexit", None, 128 + 13, None, None
         elif call.startswith("--- "):
             rest = call[len("--- ") :]
             signal, rest = rest.split(" ", 1)
