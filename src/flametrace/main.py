@@ -104,7 +104,7 @@ def _collapse_stacks(strace_output, folded_output):
     default="process",
     help="what operations to trace (io is slower but more detailed)",
 )
-@click.argument("command", nargs=-1)
+@click.argument("command", nargs=-1, required=True)
 def cli(output, flamegraph_options, mode, command):
     """Run a command and render a flamegraph based on its process tree."""
     if not output:  # pragma: no cover
