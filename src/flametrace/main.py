@@ -38,6 +38,7 @@ import tempfile
 import time
 
 import click
+from packaging.version import parse as parse_version
 
 from . import core
 
@@ -52,7 +53,7 @@ STRACE = "strace"
 def _strace_version():
     output = subprocess.check_output([STRACE, "-V"], text=True)
     line = next(iter(output.splitlines()))
-    return pkg_resources.parse_version(line.split()[-1])
+    return parse_version(line.split()[-1])
 
 
 def _run_strace(mode, argv, output):
@@ -63,7 +64,7 @@ def _run_strace(mode, argv, output):
     }
 
     strace_args = []
-    if version >= pkg_resources.parse_version("5.3"):
+    if version >= parse_version("5.3"):
         strace_args.append("--seccomp-bpf")
     strace_args.extend(
         [
