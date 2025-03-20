@@ -2,5 +2,51 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta:__legacy__"
 
+[project]
+name = "flametrace"
+requires-python = ">= 3.0"
+authors = [
+    {name = "Leif Walsh", email = "leif.walsh@gmail.com"},
+]
+description = "Build flamegraph charts for process trees, based on strace."
+license = "BSD-3-Clause"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: System :: Benchmark",
+]
+dependencies = [
+    "click",
+]
+dynamic = ["version", "readme"]
+
+[project.urls]
+Homepage = "https://github.com/leifwalsh/flametrace"
+Repository = "https://github.com/leifwalsh/flametrace.git"
+Issues = "https://github.com/leifwalsh/flametrace/issues"
+
+[project.scripts]
+flametrace = "flametrace.main:cli"
+
+[dependency-groups]
+test = ["tox"]
+docs = ["sphinx", "sphinx_click", "sphinx_rtd_theme", "rstcheck"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "flametrace.__version__"}
+readme = {file = ["README.md", "LICENSE"]}
+
+[tool.setuptools.package-data]
+flametrace = [
+    "perl/flamegraph.pl",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.black]
 line-length = 79
