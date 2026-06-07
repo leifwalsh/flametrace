@@ -46,8 +46,7 @@ class FlametraceTestBase(TestCase):
             cli, ["--output-base", self.out_base, *self.command]
         )
         self.returncode = result.exit_code
-        self.stdout = result.stdout
-        self.stderr = result.stderr
+        self.output = result.output
 
     def tearDown(self):
         self.tmpdir.cleanup()
@@ -58,9 +57,9 @@ class FlametraceTests(FlametraceTestBase):
     command = ["ls"]
 
     def test_flametrace(self):
-        self.assertIn(f"strace: {self.out_base}.strace", self.stdout)
-        self.assertIn(f"folded: {self.out_base}.folded", self.stdout)
-        self.assertIn(f"chart:  {self.out_base}.svg", self.stdout)
+        self.assertIn(f"strace: {self.out_base}.strace", self.output)
+        self.assertIn(f"folded: {self.out_base}.folded", self.output)
+        self.assertIn(f"chart:  {self.out_base}.svg", self.output)
         self.assertEqual(0, self.returncode)
 
 
