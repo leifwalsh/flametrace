@@ -57,10 +57,12 @@ class FlametraceTests(FlametraceTestBase):
     command = ["ls"]
 
     def test_flametrace(self):
+        self.assertEqual(
+            0, self.returncode, "Command failed:\n\n" + self.output
+        )
         self.assertIn(f"strace: {self.out_base}.strace", self.output)
         self.assertIn(f"folded: {self.out_base}.folded", self.output)
         self.assertIn(f"chart:  {self.out_base}.svg", self.output)
-        self.assertEqual(0, self.returncode)
 
 
 @skipUnless(
