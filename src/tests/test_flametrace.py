@@ -41,7 +41,7 @@ class FlametraceTestBase(TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.out_base = Path(self.tmpdir.name, "trace")
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         result = runner.invoke(
             cli, ["--output-base", self.out_base, *self.command]
         )
