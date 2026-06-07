@@ -28,7 +28,7 @@
 
 from collections import defaultdict, namedtuple
 import copy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import sys
 
 
@@ -81,7 +81,7 @@ class StraceParser(object):
         """Parse a line of strace output, collapsing "unfinished" traces."""
         s = line.split(None, 2)
         pid = int(s[0])
-        ts = datetime.utcfromtimestamp(float(s[1]))
+        ts = datetime.fromtimestamp(float(s[1]), timezone.utc)
         if s[2].endswith(" <unfinished ...>"):
             assert pid not in self.pending
             self.pending[pid] = s[2][: -len(" <unfinished ...>")]
