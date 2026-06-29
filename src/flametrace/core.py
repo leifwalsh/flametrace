@@ -291,7 +291,7 @@ class Collapser(object):
 
     def handle_call(self, call):
         """Consume strace calls into the process map."""
-        if call.func == "clone":
+        if call.func in ("clone", "clone3"):
             # We've seen a process get created, and assume we'll see it
             # exec something later (in execve).
             self.pmap[call.retcode] = Process(
