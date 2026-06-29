@@ -41,13 +41,12 @@ class FlametraceTestBase(TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.out_base = Path(self.tmpdir.name, "trace")
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         result = runner.invoke(
             cli, ["--output-base", self.out_base, *self.command]
         )
         self.returncode = result.exit_code
-        self.stdout = result.stdout
-        self.stderr = result.stderr
+        self.output = result.output
 
     def tearDown(self):
         self.tmpdir.cleanup()
@@ -58,16 +57,17 @@ class FlametraceTests(FlametraceTestBase):
     command = ["ls"]
 
     def test_flametrace(self):
-        self.assertEqual("", self.stderr)
-        self.assertIn(f"strace: {self.out_base}.strace", self.stdout)
-        self.assertIn(f"folded: {self.out_base}.folded", self.stdout)
-        self.assertIn(f"chart:  {self.out_base}.svg", self.stdout)
-        self.assertEqual(0, self.returncode)
+        self.assertEqual(
+            0, self.returncode, "Command failed:\n\n" + self.output
+        )
+        self.assertIn(f"strace: {self.out_base}.strace", self.output)
+        self.assertIn(f"folded: {self.out_base}.folded", self.output)
+        self.assertIn(f"chart:  {self.out_base}.svg", self.output)
 
 
 @skipUnless(
-    sys.version_info.major == 3 and sys.version_info.minor == 9,
-    "only run on python 3.9",
+    sys.version_info.major == 3 and sys.version_info.minor == 14,
+    "only run on python 3.14",
 )
 class Flake8FlametraceTests(FlametraceTests):
 

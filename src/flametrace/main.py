@@ -30,21 +30,20 @@ from datetime import datetime
 import functools
 import os
 import os.path
-import pkg_resources
 import shlex
 import subprocess
 import sys
 import tempfile
 import time
+from importlib.resources import as_file, files
 
 import click
+from packaging.version import parse as parse_version
 
 from . import core
 
 
-FLAMEGRAPH = pkg_resources.resource_filename(
-    "flametrace", "perl/flamegraph.pl"
-)
+FLAMEGRAPH = files("flametrace").joinpath("perl/flamegraph.pl")
 STRACE = "strace"
 
 
@@ -52,7 +51,7 @@ STRACE = "strace"
 def _strace_version():
     output = subprocess.check_output([STRACE, "-V"], text=True)
     line = next(iter(output.splitlines()))
-    return pkg_resources.parse_version(line.split()[-1])
+    return parse_version(line.split()[-1])
 
 
 def _run_strace(mode, argv, output):
@@ -63,7 +62,7 @@ def _run_strace(mode, argv, output):
     }
 
     strace_args = []
-    if version >= pkg_resources.parse_version("5.3"):
+    if version >= parse_version("5.3"):
         strace_args.append("--seccomp-bpf")
     strace_args.extend(
         [
@@ -105,7 +104,7 @@ def _collapse_stacks(strace_output, folded_output):
     default="process",
     help="what operations to trace (io is slower but more detailed)",
 )
-@click.argument("command", nargs=-1)
+@click.argument("command", nargs=-1, required=True)
 def cli(output, flamegraph_options, mode, command):
     """Run a command and render a flamegraph based on its process tree."""
     if not output:  # pragma: no cover
@@ -127,22 +126,23 @@ def cli(output, flamegraph_options, mode, command):
     click.echo(f'Ran "{cmd}" in {t1 - t0:.2f}s')
 
     _collapse_stacks(strace_output, folded_output)
-    flamegraph_cmd = [
-        FLAMEGRAPH,
-        "--flamechart",
-        "--countname",
-        "us",
-        "--nametype",
-        "Frame:",
-        "--colors",
-        "aqua",
-        "--width",
-        "1600",
-    ]
-    if flamegraph_options:
-        flamegraph_cmd.extend(shlex.split(flamegraph_options))
-    flamegraph_cmd.append(folded_output)
-    subprocess.check_call(flamegraph_cmd, stdout=open(svg_output, "w"))
+    with as_file(FLAMEGRAPH) as exe:
+        flamegraph_cmd = [
+            exe.as_posix(),
+            "--flamechart",
+            "--countname",
+            "us",
+            "--nametype",
+            "Frame:",
+            "--colors",
+            "aqua",
+            "--width",
+            "1600",
+        ]
+        if flamegraph_options:
+            flamegraph_cmd.extend(shlex.split(flamegraph_options))
+        flamegraph_cmd.append(folded_output)
+        subprocess.check_call(flamegraph_cmd, stdout=open(svg_output, "w"))
 
     click.echo(f"strace: {strace_output}")
     click.echo(f"folded: {folded_output}")

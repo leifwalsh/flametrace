@@ -28,7 +28,7 @@
 
 from collections import defaultdict, namedtuple
 import copy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import sys
 
 
@@ -48,6 +48,8 @@ class StraceParser(object):
             return "atexit", None, retcode, None, None
         elif call == "+++ killed by SIGPIPE +++":
             return "atexit", None, 128 + 13, None, None
+        elif call == "+++ killed by SIGTERM +++":
+            return "atexit", None, 128 + 15, None, None
         elif call.startswith("--- "):
             rest = call[len("--- ") :]
             signal, rest = rest.split(" ", 1)
@@ -81,7 +83,7 @@ class StraceParser(object):
         """Parse a line of strace output, collapsing "unfinished" traces."""
         s = line.split(None, 2)
         pid = int(s[0])
-        ts = datetime.utcfromtimestamp(float(s[1]))
+        ts = datetime.fromtimestamp(float(s[1]), timezone.utc)
         if s[2].endswith(" <unfinished ...>"):
             assert pid not in self.pending
             self.pending[pid] = s[2][: -len(" <unfinished ...>")]
@@ -289,7 +291,7 @@ class Collapser(object):
 
     def handle_call(self, call):
         """Consume strace calls into the process map."""
-        if call.func == "clone":
+        if call.func in ("clone", "clone3"):
             # We've seen a process get created, and assume we'll see it
             # exec something later (in execve).
             self.pmap[call.retcode] = Process(
